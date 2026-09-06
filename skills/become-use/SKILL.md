@@ -1,0 +1,68 @@
+---
+name: become-use
+description: >-
+  Use this BEFORE calling BECOME MCP tools (become_ask, become_status,
+  become_result, become_spec_check). Covers ask→status→result order, question
+  shapes, certify/bid flags, and NON-BECOME / TEST_ONLY labels.
+disable-model-invocation: false
+---
+
+# BECOME MCP Server — Usage Skill
+
+BECOME MCP lets an agent ask certified questions without writing Gallina. The server forms the Coq job from the question.
+
+## 1. Connect
+
+Remote HTTP MCP URL is documented in the repo README (interim tunnel may change). Config shape:
+
+```json
+{
+  "mcpServers": {
+    "become": {
+      "type": "http",
+      "url": "https://YOUR-HOST/mcp"
+    }
+  }
+}
+```
+
+## 2. Happy path (always this order)
+
+1. `become_ask` with `question` (default toy: `"1 + 1 = ?"`).
+2. Keep `job_id` from the response.
+3. `become_status` with that `job_id` until complete (or rely on ask if it returns synchronously).
+4. `become_result` for `answer.v` / inbox / visible numerals.
+
+Do not invent job ids. Do not skip `become_ask`.
+
+## 3. Question shapes
+
+- Prefer plain arithmetic toys the server already knows (`1 + 1 = ?`, `3 + 3 = ?`) unless docs say a broader parser is live.
+- Agent should **not** paste full Coq developments unless a documented advanced tool requires it.
+- Default path is coqchk-only (`certify: false` / omitted).
+
+## 4. Certify / bid
+
+- `certify: true` requests SP1 + PayHook settlement when pins are live.
+- `bid_wei` optional; zero-bid toys are common in TEST_ONLY.
+- If certify fails or pins are missing, report the error; do not claim production settlement.
+
+## 5. Labels (mandatory in user-facing replies)
+
+Always treat outputs as **NON-BECOME / TEST_ONLY** until the founder freezes production pins. Do not tell the user a jobHash is official interim-id unless docs say so.
+
+## 6. REST fallback
+
+If MCP tools are unavailable:
+
+```bash
+curl -s -X POST "https://YOUR-HOST/v1/ask" \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"1 + 1 = ?"}'
+```
+
+## 7. What not to do
+
+- Do not send private keys, salts that must stay secret, or credentials through ask.
+- Do not claim full coqchk-in-guest or production hook settlement without evidence from the tool result.
+- Do not confuse Beloved Ecosystem (factory) with BECOME (this DVM ask path).
