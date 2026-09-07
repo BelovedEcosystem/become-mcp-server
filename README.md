@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/Model_Context_Protocol-compatible-000000?logo=modelcontextprotocol&logoColor=white" alt="MCP compatible"></a>
-  <a href="#data-and-security"><img src="https://img.shields.io/badge/Auth-Interim_open_tunnel-b45309" alt="Auth: interim"></a>
+  <a href="#data-and-security"><img src="https://img.shields.io/badge/Auth-Bearer_API_key-0ea5e9" alt="Auth: Bearer API key"></a>
   <a href="#how-to-connect"><img src="https://img.shields.io/badge/Hosting-Remote_HTTP_MCP-0ea5e9" alt="Hosting: Remote HTTP MCP"></a>
 </p>
 
@@ -42,10 +42,13 @@ BECOME MCP works with any app that supports remote HTTP MCP, including:
 
 Add the BECOME MCP server URL to your AI client’s MCP settings:
 
-**MCP URL (interim tunnel — may change):**  
-`https://finals-affair-designed-constitutes.trycloudflare.com/mcp`
+**MCP URL (public host):**  
+`https://mcp.belovedecosystem.com/mcp`
 
-Landing / health: `https://finals-affair-designed-constitutes.trycloudflare.com/`
+Landing / health: `https://mcp.belovedecosystem.com/`  
+Contract detail for agents: `https://mcp.belovedecosystem.com/agent.md`
+
+Requests are authenticated with your operator `BECOME_MCP_API_KEY` as a Bearer token.
 
 ### Cursor / Claude (HTTP MCP)
 
@@ -54,17 +57,30 @@ Landing / health: `https://finals-affair-designed-constitutes.trycloudflare.com/
   "mcpServers": {
     "become": {
       "type": "http",
-      "url": "https://finals-affair-designed-constitutes.trycloudflare.com/mcp"
+      "url": "https://mcp.belovedecosystem.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_BECOME_MCP_API_KEY"
+      }
     }
   }
 }
 ```
 
-1. Add the URL in your client’s MCP settings.
+1. Add the URL **and the `Authorization` header** in your client’s MCP settings (Claude: Settings → Connectors → custom MCP).
 2. Start a chat and ask BECOME a question (see prompts below).
 3. Prefer loading the [`become-use`](skills/become-use/SKILL.md) skill first so tool calls stay well-formed.
 
-**Tip:** When the public host becomes stable, update the URL in this README and in `skills/become-use/SKILL.md`.
+**Never paste your API key into a chat thread** — it belongs only in the connector headers.
+
+### Smoke test
+
+Once connected, one prompt is enough:
+
+> Ask BECOME: 5 + 1 = ? Use become_orchestrate with bid_wei=0.
+
+Default smoke is `certify: false` → expect Settled **6**.
+
+For the full certified path, add `certify: true`, `chain: sepolia` — slower, and still **TEST_ONLY** until production pins are frozen.
 
 ## Agent skill
 
@@ -82,6 +98,7 @@ npx skills install BelovedEcosystem/become-mcp-server -g
 
 | Category | What you can do |
 | -------- | ---------------- |
+| **Orchestrate** | `become_orchestrate` — one-call ask → settle; takes `bid_wei`, `certify`, `chain` |
 | **Ask** | `become_ask` — plain-language question; server forms Coq + optional bid/certify |
 | **Status** | `become_status` — poll by `job_id` |
 | **Result** | `become_result` — `answer.v`, inbox, visible numerals |
@@ -90,6 +107,7 @@ npx skills install BelovedEcosystem/become-mcp-server -g
 
 ### Example prompts
 
+* “Ask BECOME: 5 + 1 = ? Use become_orchestrate with bid_wei=0.”
 * “Ask BECOME: 1 + 1 = ?”
 * “Run become_ask for 3 + 3 and show the result.”
 * “What’s the status of job \<id\>?”
@@ -98,7 +116,7 @@ Default toy: `1 + 1 = ?` → visible `2` via coqchk. Set `certify: true` for SP1
 
 ## Data and security
 
-* **Interim hosting** — the public URL may be an ephemeral tunnel. Prefer a stable host + auth before production.
+* **API key** — keep `BECOME_MCP_API_KEY` in your client’s connector headers only. Do not paste it into a chat thread, a commit, or an issue.
 * **No secrets** — do not send private keys, salts you must keep, or credentials through the ask path.
 * **Labels** — responses and this repo mark **NON-BECOME / TEST_ONLY** until official `jobHash` / coqchk-in-guest / founder pins exist.
 * **Scope** — the assistant can only do what the MCP tools expose; settlement and key custody stay out of band.
@@ -128,7 +146,7 @@ Yes. Any MCP server draws on your AI client’s message limits or tokens.
 
 ### Is this production BECOME?
 
-Not yet. Treat everything here as **interim / TEST_ONLY** until the founder freezes production pins (jobHash, verifier, programVKey, stable hostname, auth).
+Not yet. The hostname and auth are now stable, but treat answers as **interim / TEST_ONLY** until the founder freezes production pins (jobHash, verifier, programVKey).
 
 ## License
 
