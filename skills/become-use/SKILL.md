@@ -1,68 +1,62 @@
 ---
 name: become-use
 description: >-
-  Use this BEFORE calling BECOME MCP tools (become_ask, become_status,
-  become_result, become_spec_check). Covers ask→status→result order, question
-  shapes, certify/bid flags, and NON-BECOME / TEST_ONLY labels.
+  Use this BEFORE calling BECOME MCP tools (become_orchestrate, become_status,
+  become_result, become_ask). Covers Gallina target, zero-bid default, certify
+  vs smoke, Proving poll rules, and Settled-only answer trust.
 disable-model-invocation: false
 ---
 
-# BECOME MCP Server — Usage Skill
+# BECOME MCP — Usage Skill
 
-BECOME MCP lets an agent ask certified questions without writing Gallina. The server forms the Coq job from the question.
+Remote HTTP MCP: `https://mcp.belovedecosystem.com/mcp`  
+Contract: `https://mcp.belovedecosystem.com/agent.md`  
+Auth: vault `BECOME_MCP_API_KEY` as `Authorization: Bearer` or `X-Api-Key` (never chat-paste).
 
 ## 1. Connect
-
-Remote HTTP MCP URL is documented in the repo README (interim tunnel may change). Config shape:
 
 ```json
 {
   "mcpServers": {
-    "become": {
+    "beloved-become": {
       "type": "http",
-      "url": "https://YOUR-HOST/mcp"
+      "url": "https://mcp.belovedecosystem.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${BECOME_MCP_API_KEY}"
+      }
     }
   }
 }
 ```
 
-## 2. Happy path (always this order)
+Claude custom connector: name **Beloved BECOME**, same URL, vault the key. See `docs/CLAUDE-CONNECTOR.md`.
 
-1. `become_ask` with `question` (default toy: `"1 + 1 = ?"`).
-2. Keep `job_id` from the response.
-3. `become_status` with that `job_id` until complete (or rely on ask if it returns synchronously).
-4. `become_result` for `answer.v` / inbox / visible numerals.
+## 2. Happy path
 
-Do not invent job ids. Do not skip `become_ask`.
+1. Prefer **`become_orchestrate`** with Gallina `target` (e.g. `exists n : nat, 5 + 1 = n`), `bid_wei=0`, `chain=sepolia`.
+2. Keep `job_id`.
+3. If not Settled yet: poll **`become_status`** (then **`become_result`**) while `terminal=false` / `poll_after_ms` > 0.
+4. Trust `answer` / `inbox` **only** when `agent_status=Settled`.
 
-## 3. Question shapes
+Do not invent job ids. Prefer orchestrate over `become_ask` unless the user names a non-zero bid.
 
-- Prefer plain arithmetic toys the server already knows (`1 + 1 = ?`, `3 + 3 = ?`) unless docs say a broader parser is live.
-- Agent should **not** paste full Coq developments unless a documented advanced tool requires it.
-- Default path is coqchk-only (`certify: false` / omitted).
+## 3. Ask shape
 
-## 4. Certify / bid
+- Request details = Gallina `target` only. NL-only → `gallina_required`.
+- Client knobs: `bid_wei` + optional `due_date`.
+- Smoke: `certify: false`. Full cert: `certify: true` (EC2 prove; often ~60–70m for toys). Prefer `wait: false` then poll.
 
-- `certify: true` requests SP1 + PayHook settlement when pins are live.
-- `bid_wei` optional; zero-bid toys are common in TEST_ONLY.
-- If certify fails or pins are missing, report the error; do not claim production settlement.
+## 4. While Proving
 
-## 5. Labels (mandatory in user-facing replies)
+Also read `how`, `run_url`/`actions_url`, `progress`/`proof_present`, `failed`/`in_progress`.  
+`certify_requires_ec2`, staged/`Proving`, and quiet `missing_proof` are **normal** — keep polling.  
+If `auto_generate` / `run_id` present → **poll only** (no S3 / GHA yourself).  
+Do not treat `ok` or `summary_for_model` alone as fail/success.
 
-Always treat outputs as **NON-BECOME / TEST_ONLY** until the founder freezes production pins. Do not tell the user a jobHash is official interim-id unless docs say so.
+## 5. Until Settled
 
-## 6. REST fallback
+Never trust `answer`, `inbox`, `answer_v`, or `visible_result` before `Settled`.
 
-If MCP tools are unavailable:
+## 6. Honesty
 
-```bash
-curl -s -X POST "https://YOUR-HOST/v1/ask" \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"1 + 1 = ?"}'
-```
-
-## 7. What not to do
-
-- Do not send private keys, salts that must stay secret, or credentials through ask.
-- Do not claim full coqchk-in-guest or production hook settlement without evidence from the tool result.
-- Do not confuse Beloved Ecosystem (factory) with BECOME (this DVM ask path).
+BecomeJobHash/v0 · T2CERT0 · Sepolia ≠ mainnet · no private keys in ask.
