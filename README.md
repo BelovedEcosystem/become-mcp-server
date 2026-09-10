@@ -20,6 +20,20 @@
   <a href="#how-to-connect"><img src="https://img.shields.io/badge/Hosting-Remote_HTTP_MCP-0ea5e9" alt="Hosting: Remote HTTP MCP"></a>
 </p>
 
+## Fastest connect
+
+**Claude Code (one line):**
+
+```bash
+claude mcp add --transport http become https://mcp.belovedecosystem.com/mcp
+```
+
+**Claude.ai / Desktop:** Settings → Connectors → Add custom connector → paste `https://mcp.belovedecosystem.com/mcp`.
+
+**Any client with a project config:** this repo ships a root [`.mcp.json`](.mcp.json); clone it and Claude Code offers the server automatically. No header is pinned, so the client can fall back to browser login once the host serves OAuth; until then add `--header "Authorization: Bearer <key>"`.
+
+Design target for the host so that step one needs **no key at all** for zero-bid smoke tests: [`docs/LEAST-FRICTION.md`](docs/LEAST-FRICTION.md).
+
 ## Production host
 
 | | URL |
