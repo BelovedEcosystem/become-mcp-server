@@ -1,0 +1,89 @@
+# Registry entry for Nostr kinds 5700 / 6700 (NIP-90 job request / result).
+#
+# Paste these two blocks into schema.yaml of
+# https://github.com/nostr-protocol/registry-of-kinds and open a pull request
+# titled "Add kinds 5700/6700: ERC-7683 order request and result".
+# Kind 7000 (job feedback) is already defined by NIP-90 and is reused as is.
+#
+# Both numbers were free in the archived DVM registry
+# (nostr-protocol/data-vending-machines, read-only since 2026-09-07) and in
+# registry-of-kinds as of 2026-09-10.
+
+  5700:
+    description: >-
+      ERC-7683 order request (NIP-90 job request). The event asks a solver to
+      resolve and fill an ERC-7683 order. What the order is about is defined
+      by the resolver named in the R tag, not by this kind. Content is the
+      ERC-7683 payload consumable by IResolver.resolve: NIP-44 encrypted to
+      the claimant when a p tag is present, plain when the order is open to
+      any solver. Funding and payment are on chain via the resolver's
+      settlement contract; this kind uses no i, output or bid tags and never
+      emits a payment-required status.
+    in_use: true
+    content:
+      type: free
+    required:
+      - R
+      - x
+    tags:
+      - name: p
+        next:
+          type: pubkey
+          required: true
+        description: exclusive claimant; when present the content is encrypted to this key
+      - name: R
+        next:
+          type: string
+          required: true
+        description: resolver contract as an ERC-7930 interoperable address (carries chain id)
+      - name: x
+        next:
+          type: string
+          required: true
+        description: order id (32-byte hex); for BECOME this is the job hash
+      - name: expiration
+        next:
+          type: integer
+          required: true
+        description: fill deadline as a unix timestamp (NIP-40)
+      - name: relays
+        next:
+          type: string
+          required: true
+        description: relays where the solver should publish feedback and the result
+    multiple:
+      - relays
+
+  6700:
+    description: >-
+      ERC-7683 order result (NIP-90 job result for kind 5700). References the
+      request and the settlement transaction that paid the solver. Content is
+      the deliverable, NIP-44 encrypted to the customer.
+    in_use: true
+    content:
+      type: free
+    required:
+      - e
+      - p
+      - x
+    tags:
+      - name: e
+        next:
+          type: eventid
+          required: true
+        description: the kind 5700 request
+      - name: p
+        next:
+          type: pubkey
+          required: true
+        description: the customer
+      - name: x
+        next:
+          type: string
+          required: true
+        description: order id, same value as in the request
+      - name: settlement
+        next:
+          type: string
+          required: true
+        description: settlement transaction hash on the resolver's chain

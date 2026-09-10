@@ -277,7 +277,7 @@ are placeholders: the kind, the JSON order, and the payment tags.
 
 | NIP-90 element | BECOME use |
 |---|---|
-| job request kind (5000-5999) | one founder-pinned kind in range; 51000 is outside NIP-90 and is a test placeholder |
+| job request kind (5000-5999) | **5700** (owner decision 2026-09-10): "ERC-7683 order request". Result kind **6700**. The kind means "resolve and fill this ERC-7683 order"; what the job is about lives in the resolver, not the kind. 51000 was a test placeholder outside NIP-90. Registry text: [`nostr-kind-5700.yaml`](nostr-kind-5700.yaml) |
 | `p` tag | BECOME's pubkey; mirrors `claimant` (absent when `claimant = address(0)`) |
 | `encrypted` + content | NIP-44 v2 to BECOME's key: the development, salt, `specRoot`, target, and the full `BecomeOrderData`; NIP-90 text names NIP-04, which is superseded and should be noted as a deliberate deviation |
 | clear tags | routing and money only, per the DVM spec §4: `param payhook`, `param jobHash`, `param orderDataType`, `param cap` (wei), `relays`; no `i` tag with source text |
@@ -297,8 +297,21 @@ and the prover start.
 
 ### What standardizing changes on the Nostr side
 
-- Pin one job kind and get it allowlisted on Buzz, retiring the gift-wrap
-  fallback.
+- Register 5700 / 6700 in the protocol's registry of kinds (a pull request
+  from the owner's or Grok Bot's GitHub account; the text is in
+  `nostr-kind-5700.yaml`) and get 5700 allowlisted on Buzz, retiring the
+  gift-wrap fallback.
+- Tag layout for 5700: `p` = exclusive claimant (optional), `R` = resolver as
+  an ERC-7930 interoperable address (carries the chain id), `x` = order id
+  (`jobHash`), `expiration` = fill deadline (NIP-40), `relays`. No `i`,
+  `output` or `bid` tags. Content = the ERC-7683 payload, NIP-44 encrypted
+  when `p` is present, clear when the order is open to any solver.
+- Tag layout for 6700: `e` = the 5700 request, `p` = the customer, `x` =
+  order id, `settlement` = fill transaction hash. Content = the encrypted
+  deliverable. Kind 7000 feedback unchanged, with `expired` and `canceled`
+  borrowed from NIP-69's status set.
+- The listener filters on `#p` and `#R`, never on the kind alone, so BECOME
+  does not download every intent on a relay.
 - Replace the JSON `BecomeServiceRequest/v0` with the ABI `BecomeOrderData`
   v1 inside the encrypted content, and derive the clear `param` tags from it.
 - Publish the kind 31990 announcement with the resolver and PayHook pins.
@@ -312,7 +325,7 @@ and the prover start.
 - Whether `claimant = address(0)` orders are ever accepted (the market future).
 - ERC-20 stakes, cross-chain funding, fiat relayers: each is a v2 field or an
   envelope choice, none changes v1.
-- Which job kind number is pinned, and who registers it.
+- Who submits the registry pull request for 5700 / 6700 (owner or Grok Bot).
 - Whether the resolver ships first as an on-chain contract or as the host's
   reference implementation.
 
