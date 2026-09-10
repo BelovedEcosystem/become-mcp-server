@@ -11,7 +11,7 @@ disable-model-invocation: false
 
 Remote HTTP MCP: `https://mcp.belovedecosystem.com/mcp`  
 Contract: `https://mcp.belovedecosystem.com/agent.md`  
-Auth: vault `BECOME_MCP_API_KEY` as `Authorization: Bearer` or `X-Api-Key` (never chat-paste).
+Auth: none required. Leave the connector's auth empty (never chat-paste a key).
 
 ## 1. Connect
 
@@ -20,22 +20,19 @@ Auth: vault `BECOME_MCP_API_KEY` as `Authorization: Bearer` or `X-Api-Key` (neve
   "mcpServers": {
     "beloved-become": {
       "type": "http",
-      "url": "https://mcp.belovedecosystem.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${BECOME_MCP_API_KEY}"
-      }
+      "url": "https://mcp.belovedecosystem.com/mcp"
     }
   }
 }
 ```
 
-Claude custom connector: name **Beloved BECOME**, same URL, vault the key. See `docs/CLAUDE-CONNECTOR.md`.
+Claude custom connector: name **Beloved BECOME**, same URL, auth empty. See `docs/CLAUDE-CONNECTOR.md`.
 
 ## 2. Happy path
 
 1. Prefer **`become_orchestrate`** with Gallina `target` (e.g. `exists n : nat, 5 + 1 = n`), `bid_wei=0`, `chain=sepolia`.
-2. Keep `job_id`.
-3. If not Settled yet: poll **`become_status`** (then **`become_result`**) while `terminal=false` / `poll_after_ms` > 0.
+2. Keep `job_id` **and** `owner_token` from the response; pass both when polling.
+3. If not Settled yet: poll **`become_status`** (then **`become_result`**) with `job_id` + `owner_token` while `terminal=false`. Polling early is harmless; certified proofs take ~1–2 h.
 4. Trust `answer` / `inbox` **only** when `agent_status=Settled`.
 
 Do not invent job ids. Prefer orchestrate over `become_ask` unless the user names a non-zero bid.
