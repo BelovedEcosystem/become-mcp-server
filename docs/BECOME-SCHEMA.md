@@ -256,6 +256,31 @@ returns today (`become-mcp-orchestrate/v0`); "v1" marks fields the schema adds.
 the target is the ask, and the bid policy is host acceptance logic, not a
 client flag.
 
+
+### Deadlines
+
+`due_date` is one value with five names. Only the PayHook enforces it.
+
+| Layer | Name | Role |
+|---|---|---|
+| `Request` | `due_date` (live alias) -> `fill_deadline` (v1) | what the client asks for; unix seconds or ISO-8601 |
+| ERC-7683 envelope | `fillDeadline` | what the client signs |
+| kind 5700 | `expiration` tag | when relays may drop the request (NIP-40) |
+| PayHook | `open(…, deadline)`, `jobs().deadline` | enforced: `fill` reverts after it; stake reclaimable by `refundTo` |
+| `Job` | `fill_deadline` | echoed, never null (server default fills it) |
+
+On expiry: kind 7000 `expired`; `Job.agent_status = "Failed"`, `code =
+"expired"`, `terminal = true`. `open_deadline` is separate: the last moment
+the stake may be locked, relevant only when a relayer or fiat checkout
+opens the order on the client's behalf. In the anonymous tier the host funds
+at creation and `open_deadline` is creation plus a few minutes.
+
+Live behaviour (2026-09-10): `due_date` is parsed and echoed, then ignored;
+`payhook_open_fill_sepolia` opens with `now + 24h` and fills in the same
+call, because the interim host opens on chain only after the proof exists.
+v1 locks the stake first, so the client's value (or the server default,
+generous for tier 1) is the one written on chain.
+
 ### `Job` (output of every job tool): closed schema
 
 `Job` is a **closed** object: the fields below and no others
