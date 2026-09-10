@@ -1,10 +1,16 @@
 # BECOME schema v1
 
-Normative reference for a BECOME job across its layers: the pins (Deployment), the order, the Nostr transport, the chain, and the MCP view. The rationale
-is in [`ORDER-SCHEMA.md`](ORDER-SCHEMA.md); the Nostr registry text is in
-[`nostr-kind-5700.yaml`](nostr-kind-5700.yaml). Status: design, 2026-09-10.
-Nothing here is implemented yet; the live host still uses the interim
-JSON shapes in `/agent.md`.
+Projections of the BECOME data model, field by field: the pins
+(Deployment), the order, the Nostr transport, the chain, and the MCP view.
+**The data model itself is the quad dataset in
+[`SERVICE-REQUEST-QUADS.md`](SERVICE-REQUEST-QUADS.md)** (owner decision
+2026-09-10: all BECOME schema are quads). Every struct, tag and JSON field
+below is derived from a graph and a predicate there; if a field is wanted
+here, it is added as a predicate first. Rationale for the ERC-7683 choice is
+in [`ORDER-SCHEMA.md`](ORDER-SCHEMA.md); the Nostr registry text is in
+[`nostr-kind-5700.yaml`](nostr-kind-5700.yaml). Status: design. Nothing here
+is implemented yet; the live host still uses the interim JSON shapes in
+`/agent.md`.
 
 One job, one id. The order id is `jobHash`, and it appears in every layer:
 
@@ -283,6 +289,10 @@ generous for tier 1) is the one written on chain.
 
 ### `Job` (output of every job tool): closed schema
 
+Projection of the `become:order`, `become:status`, `become:settlement`,
+`become:result` and `become:deployment` graphs; each field is the
+snake_case of one predicate.
+
 `Job` is a **closed** object: the fields below and no others
 (`additionalProperties: false`). A client can validate every response, and
 the server cannot leak by accident. Operator-only data travels under one
@@ -319,6 +329,8 @@ Owner decision 2026-09-10.
   "code":              null,
   "error":             null,
   "progress":          { "run_url": null, "proof_present": true, "stage": "settled" },
+  "late":              true,                       // settled after due_date (soft); from become:status
+  "due_date":          1789050000,                 // soft; from become:order dueDate
 
   "certified":         true,
   "open_tx":           "0x…",
@@ -336,7 +348,7 @@ Owner decision 2026-09-10.
 }
 ```
 
-Field count: 36. Every field is always present (null when not applicable),
+Field count: 38 (`late`, `due_date` added with the quad model). Every field is always present (null when not applicable),
 so clients never branch on absence.
 
 Rules that hold for `Job` in every tool:
