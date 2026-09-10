@@ -2,6 +2,8 @@
 
 Status: design note, 2026-09-10. Nothing here is implemented. It fixes the
 vocabulary and the field set so that later code has one shape to follow.
+Decision recorded in §8: BECOME standardizes on the 2026 resolver-centric
+form; §9 maps the Nostr transport.
 
 ## 1. What ERC-7683 is (two versions)
 
@@ -217,14 +219,102 @@ The existing advanced tool `become_encode_service_request` is the natural
 producer of the ABI blob and the EIP-712 typed data; it is the only tool that
 would change, and it is not on the default path.
 
-## 8. What this does not decide
+## 8. Decision: standardize on the 2026 form
+
+Owner decision 2026-09-10: BECOME DVM requests standardize on the 2026
+resolver-centric ERC-7683. Concretely:
+
+- **The payload is `BecomeOrderData` v1**, ABI-encoded (§3). The 2026 form
+  does not constrain payload shape; the resolver defines it. Nothing in §3
+  changes.
+- **BECOME publishes a resolver.** `IResolver.resolve(payload)` returns the
+  `ResolvedOrder` below. Until a resolver contract is deployed, the same
+  function is provided off-chain by the host and documented as the reference;
+  the on-chain one must return byte-identical output.
+- **Client authorization stays EIP-712 over `BecomeOrderData`**, used for
+  `open` / `openFor` on the PayHook. The 2026 draft defines no signing, so
+  this layer is ours either way.
+- **The anonymous MCP tier produces the same order.** When the host is both
+  client and prover there is no Nostr hop, but every job still gets a
+  canonical order and a resolved form, so a job created by tool call, by
+  Nostr event, or by on-chain `open` is the same object with the same id.
+
+### Resolved order for a BECOME job
+
+| Part | Content |
+|---|---|
+| steps[0] | `Call` target = PayHook, selector = `fill(bytes32,bytes,bytes)`, arguments = [`jobHash`, var publicValues, var proof]; attributes `NeedsVariable(proof)`, `NeedsVariable(publicValues)`, `TimingBounds(block.timestamp, 0, fillDeadline)`, `SpendsGas(estimate)`, `RevertPolicy(abort, "already settled")`, `RevertPolicy(abort, "deadline")` |
+| variables | `StepCaller(0)` (must equal `claimant` when non-zero; stated as an assumption), `PaymentRecipient` (the stake goes to the caller; PayHook pays `msg.sender`), `Witness(kind="sp1-groth16", data=abi.encode(programVKey, payloadLocator), variables=[jobHash])` producing `proof`, `Witness(kind="sp1-public-values", ...)` producing `publicValues`, `Query(PayHook.jobs(jobHash))` for open/claimant/amount/deadline/status |
+| payments[0] | native stake `bidWei` from PayHook to `PaymentRecipient`, `onStepIdx = 0`, `estimatedDelaySeconds = 0` (paid in the fill transaction) |
+| assumptions | `sp1-verifier`, `program-vkey`, `tcb=T2CERT0`, `jobhash-scheme=BecomeJobHash/v0`, `network=sepolia`, `question-class=nat-sum`, `native-payment` (the draft's payment type is ERC-20; native ETH is declared), `exclusive-claimant` when set |
+
+Two rules of the draft bind us usefully. A resolver "MUST guarantee that an
+order may only abort as explicitly specified in revert policies", so every
+PayHook revert reason has to be enumerated in the resolved order. And named
+assumptions "require solver validation before execution", which is exactly
+the standing BECOME wants for its honesty labels.
+
+Known costs: the draft is four months old and may move; payments are ERC-20
+only (hence the `native-payment` assumption, or a WETH PayHook later); it
+requires ERC-7930 interoperable addresses in the resolved form.
+
+## 9. Nostr: transport and delivery
+
+Three layers, none overlapping: **Nostr** carries the request and the
+delivery, **the chain** holds the stake and settles, **the resolver** tells a
+prover what to do. `jobHash` ties all three.
+
+What exists in the server repo today: an outbound-only NIP-90 listener with
+NIP-42 auth and silent ignore on intake failure; NIP-44 v2 encryption to
+BECOME's key; a placeholder "logical kind" 51000 wrapped as NIP-59 gift-wrap
+(kind 1059) because the Buzz relay allowlist has no DVM kind; a JSON
+`BecomeServiceRequest/v0` order blob whose `encryptedPayloadUri` is
+`nostr-event:<id>`; an atomic `screen_request` gate that issues a token
+`enqueue_job` requires; a result publisher. The shape is right. Three things
+are placeholders: the kind, the JSON order, and the payment tags.
+
+### NIP-90 mapping
+
+| NIP-90 element | BECOME use |
+|---|---|
+| job request kind (5000-5999) | one founder-pinned kind in range; 51000 is outside NIP-90 and is a test placeholder |
+| `p` tag | BECOME's pubkey; mirrors `claimant` (absent when `claimant = address(0)`) |
+| `encrypted` + content | NIP-44 v2 to BECOME's key: the development, salt, `specRoot`, target, and the full `BecomeOrderData`; NIP-90 text names NIP-04, which is superseded and should be noted as a deliberate deviation |
+| clear tags | routing and money only, per the DVM spec §4: `param payhook`, `param jobHash`, `param orderDataType`, `param cap` (wei), `relays`; no `i` tag with source text |
+| `bid` tag | not used: NIP-90 `bid` is millisats for Lightning; the stake is on chain |
+| `relays` tag | where BECOME publishes feedback and results |
+| feedback kind 7000 `status` | `processing` = Proving, `success` = Settled, `error` = Failed; `payment-required` is never sent because funding precedes the request; `amount` tag carries the fill tx hash instead of a bolt11 |
+| result kind (request + 1000) | encrypted delivery: answer file and compiled form, `e` = request event, `p` = client, plus settlement tx reference |
+| NIP-89 kind 31990 | BECOME's handler announcement: supported job kind (`k`), plus PayHook address, resolver address, `programVKey`, `orderDataType` in content. This fills the resolver-discovery gap the 2026 draft leaves open |
+
+### Intake order (unchanged from the DVM spec)
+
+Addressed to BECOME and encrypted, else ignore. PayHook shows the job open
+with claimant BECOME, cap sufficient, deadline ahead, else ignore. Decrypt,
+rebuild the manifest, confirm `jobHash`, else ignore. Failures stay silent;
+the listener never sends NIP-90 error feedback. Only then does `resolve` run
+and the prover start.
+
+### What standardizing changes on the Nostr side
+
+- Pin one job kind and get it allowlisted on Buzz, retiring the gift-wrap
+  fallback.
+- Replace the JSON `BecomeServiceRequest/v0` with the ABI `BecomeOrderData`
+  v1 inside the encrypted content, and derive the clear `param` tags from it.
+- Publish the kind 31990 announcement with the resolver and PayHook pins.
+- Emit kind 7000 feedback from the same state machine that drives
+  `agent_status`, so an MCP poller and a Nostr subscriber see the same
+  transitions.
+
+## 10. What this does not decide
 
 - Whether to emit `Open` from the PayHook now (it costs a contract change).
 - Whether `claimant = address(0)` orders are ever accepted (the market future).
 - ERC-20 stakes, cross-chain funding, fiat relayers: each is a v2 field or an
   envelope choice, none changes v1.
-- Whether the resolver-centric 2026 form is adopted; the field set above
-  resolves cleanly into either.
+- Which job kind number is pinned, and who registers it.
+- Whether the resolver ships first as an on-chain contract or as the host's
+  reference implementation.
 
 ## Sources
 
