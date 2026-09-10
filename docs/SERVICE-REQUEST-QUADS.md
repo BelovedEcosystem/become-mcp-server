@@ -146,7 +146,7 @@ Every other schema is a function of the dataset.
 | Nostr 5700 content | all client graphs | the canonical N-Quads, NIP-44 encrypted when `claimant` is set |
 | Nostr 7000 / 6700 | `status`, `settlement`, `result` | `status` → `status` tag; `fillTx` → `settlement` tag; `result` → encrypted content |
 | NIP-89 31990 | `deployment` | content is the live deployment graph as JSON |
-| MCP `Job` (JSON) | `order`, `status`, `settlement`, `result`, `deployment` | snake_case of each predicate; the closed 36-field list in `BECOME-SCHEMA.md` |
+| MCP `Job` (JSON) | `order`, `status`, `settlement`, `result`, `deployment` | snake_case of each predicate; the closed 38-field list in `BECOME-SCHEMA.md` |
 | MCP `Request` (JSON) | `sow`, `order` | inverse projection: the host builds the client graphs from it |
 
 A projection never carries information the graphs do not. If a field is
