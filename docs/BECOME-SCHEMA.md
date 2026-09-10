@@ -1,6 +1,6 @@
 # BECOME schema v1
 
-Normative reference for a BECOME job across its three layers. The rationale
+Normative reference for a BECOME job across its layers: the pins (Deployment), the order, the Nostr transport, the chain, and the MCP view. The rationale
 is in [`ORDER-SCHEMA.md`](ORDER-SCHEMA.md); the Nostr registry text is in
 [`nostr-kind-5700.yaml`](nostr-kind-5700.yaml). Status: design, 2026-09-10.
 Nothing here is implemented yet; the live host still uses the interim
@@ -14,6 +14,56 @@ kind 5700  ──x tag───►  jobHash ◄──── publicValues[0]  ◄
 kind 7000  status       jobs(jobHash).status                  agent_status
 kind 6700  settlement   fill tx                               fill_tx / receipt_url
 ```
+
+## Layer 0: `Deployment` (the pins)
+
+Everything a job depends on that is not the job. One entry is live per
+chain; superseded entries stay so old receipts still resolve. A `Job`
+references its deployment by `payhook` and nothing else. Source of truth:
+one file in the server repo (`config/deployment.json`, to be created from
+the operator log `docs/toy-prod-pins.json`). The docs, the NIP-89
+announcement and the MCP server info are derived from it, never typed twice.
+
+Live entry, 2026-09-10:
+
+```json
+{
+  "id":               "sepolia-t2cert0-docker-2026-09-07",
+  "status":           "live",
+  "chain_id":         11155111,
+  "network":          "sepolia",
+  "payhook":          "0x8FA889E7C6d9C74EA5ee2b4BFaf4DB8cE8e964B8",
+  "payhook_deploy_tx":"0x804c4d91a386ca60d81109473626ae16c46949d65110066963b8500340933221",
+  "verifier":         "0xb69f2584CBcFf99a58C4e7002E8b89Af54a6f4e2",
+  "program_vkey":     "0x00116101c20b687297ae11e1fea4bd4bd003ef3320da147a3db1f65bc81f388c",
+  "guest":            "T2CERT0",
+  "elf_sha256":       "854cd998ab847cd2d85f3c954e0449e7c64046909e5ce98d8b6aa5ff0a31cbb9",
+  "elf_build":        { "how": "docker", "sp1_sdk": "6.6.0",
+                        "ci": "https://github.com/BelovedEcosystem/become-sp1-skeleton/actions/runs/34074962548",
+                        "commit": "f26f129fd258cf5bcaf9b494bd5da32ff2e08017" },
+  "claimant":         "0x11bD4139BaAfcd9F19DA44D924b499AfD29032Eb",
+  "resolver":         null,
+  "order_data_type":  null,
+  "jobhash_scheme":   "BecomeJobHash/v0",
+  "accepted_assumptions": [
+    { "id": "sha256_inj", "statement": "forall a b, SHA256 a = SHA256 b -> a = b",
+      "role": "T2 digest => fixture / T2_certificate_soundness", "accepted_by": "Chinedu", "accepted_at": "2026-09-07" }
+  ],
+  "deployed_at":      "2026-09-07",
+  "signed_off_by":    "Chinedu"
+}
+```
+
+`resolver` and `order_data_type` are null until the resolver contract exists
+and the type string is frozen; every other value is live today. Superseded
+entries (PayHooks `0x0c85…d5f7`, `0x3adb…DDE7`, `0x66D0…eba1`,
+`0x7076…7199` and their keys) move under `"status": "superseded"` with the
+same shape.
+
+The resolved-order assumptions (Layer 1b) are this object rendered as
+name/value pairs; the NIP-89 announcement (Layer 2b) is this object minus
+the build details; the MCP `labels` field is its `guest`, `jobhash_scheme`,
+`network` and `question_class`.
 
 ## Layer 1: the order (ERC-7683 payload)
 
@@ -121,7 +171,7 @@ transaction. Verifier address and `programVKey` are immutables of the hook.
 | steps[0] | `Call` payHook.`fill(bytes32,bytes,bytes)` with [`jobHash`, var `publicValues`, var `proof`]; `NeedsVariable(proof)`, `NeedsVariable(publicValues)`, `TimingBounds(block.timestamp, 0, fillDeadline)`, `SpendsGas(est)`, `RevertPolicy(abort, "settled")`, `RevertPolicy(abort, "deadline")`, `RevertPolicy(abort, "bad proof")` |
 | variables | `StepCaller(0)`; `PaymentRecipient` (= caller); `Witness("sp1-groth16", abi.encode(programVKey, payloadLocator), [jobHash]) -> proof`; `Witness("sp1-public-values", same) -> publicValues`; `Query(payHook.jobs(jobHash))` |
 | payments[0] | native `bidWei` from payHook to `PaymentRecipient`, on step 0, delay 0 |
-| assumptions | `sp1-verifier=<addr>`, `program-vkey=<bytes32>`, `tcb=T2CERT0`, `jobhash-scheme=BecomeJobHash/v0`, `network=sepolia`, `question-class=nat-sum`, `native-payment`, `exclusive-claimant=<addr>` when set |
+| assumptions | `sp1-verifier=0xb69f2584CBcFf99a58C4e7002E8b89Af54a6f4e2`, `program-vkey=0x00116101c20b687297ae11e1fea4bd4bd003ef3320da147a3db1f65bc81f388c`, `tcb=T2CERT0`, `jobhash-scheme=BecomeJobHash/v0`, `network=sepolia`, `question-class=nat-sum`, `native-payment`, `exclusive-claimant=<addr>` when set |
 
 ## Layer 2b: progress and delivery on Nostr
 
@@ -157,9 +207,12 @@ Decrypted content: `{ "schema": "become-result/v1", "answer.v": "<source>",
 "receipt_url": "https://sepolia.etherscan.io/tx/0xf80d…" }`.
 
 Discovery, kind 31990 (NIP-89), published by BECOME: `["k","5700"]`, content
-`{ "name": "Beloved BECOME", "resolvers": ["<R>"], "payHook": "<addr>",
-"programVKey": "<bytes32>", "orderDataType": "<typehash>", "mcp":
-"https://mcp.belovedecosystem.com/mcp" }`.
+`{ "name": "Beloved BECOME", "resolvers": [], "payHook":
+"0x8FA889E7C6d9C74EA5ee2b4BFaf4DB8cE8e964B8", "programVKey":
+"0x00116101c20b687297ae11e1fea4bd4bd003ef3320da147a3db1f65bc81f388c",
+"orderDataType": null, "chainId": 11155111, "mcp":
+"https://mcp.belovedecosystem.com/mcp" }` (derived from the live
+`Deployment`; `resolvers` fills when one is deployed).
 
 ## Layer 4: MCP
 
@@ -203,58 +256,63 @@ returns today (`become-mcp-orchestrate/v0`); "v1" marks fields the schema adds.
 the target is the ask, and the bid policy is host acceptance logic, not a
 client flag.
 
-### `Job` (output of every job tool)
+### `Job` (output of every job tool): closed schema
+
+`Job` is a **closed** object: the fields below and no others
+(`additionalProperties: false`). A client can validate every response, and
+the server cannot leak by accident. Operator-only data travels under one
+`diagnostics` key that is present only when an operator key was sent.
+Owner decision 2026-09-10.
 
 ```json
 {
-  // identity
-  "schema":            "become-mcp-job/v1",        // live: "become-mcp-orchestrate/v0"
-  "job_id":            "orch-45plus8-d89ad7cd",    // host-local handle; not in the order
-  "job_hash":          "0x3b3208bf…869af2",        // = Layer 1 jobHash = 5700 x tag = publicValues[0]
-  "owner_token":       "…",                        // only on create; session credential, never on chain
-  "order_data_type":   "0x…",                      // v1: BECOME_ORDER_DATA_TYPE_HASH
-  "schema_version":    1,                          // v1
+  "schema":            "become-mcp-job/v1",
+  "job_id":            "orch-45plus8-d89ad7cd",
+  "job_hash":          "0x3b3208bf11f9c30a2e5e29016d333eb6e72372a1f68464224be80faf1c869af2",
+  "owner_token":       "…",                        // create only
+  "payhook":           "0x8FA889E7C6d9C74EA5ee2b4BFaf4DB8cE8e964B8",   // -> Deployment
 
-  // the order, as sent (Layer 1 mirror)
   "target":            "exists n : nat, 45 + 8 = n",
-  "tier":              1,                          // v1; live: "certify": true
+  "gloss":             "45 plus 8",                // the English label, if sent
+  "tier":              1,
   "bid_wei":           0,
-  "chain":             "sepolia",                  // v1 adds "origin_chain_id": 11155111
-  "fill_deadline":     1789086400,                 // live: "due_date"
-  "open_deadline":     1789003600,                 // v1
-  "claimant":          "0x…",                      // v1
-  "refund_to":         "0x…",                      // v1
-  "spec_root":         "0x0…",                     // v1, zero under BecomeJobHash/v0
-  "acceptance_rule_hash": "0x0…",                  // v1
-  "payload_hash":      "0x0…",                     // v1, zero when the request never left the host
-  "payload_locator":   "0x0…",                     // v1, 5700 event id when it did
+  "chain_id":          11155111,
+  "open_deadline":     1789003600,
+  "fill_deadline":     1789086400,
+  "claimant":          "0x11bD4139BaAfcd9F19DA44D924b499AfD29032Eb",
+  "refund_to":         "0x11bD4139BaAfcd9F19DA44D924b499AfD29032Eb",
+  "spec_root":         "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "acceptance_rule_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "payload_hash":      "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "payload_locator":   "0x0000000000000000000000000000000000000000000000000000000000000000",
 
-  // state (kind 7000 mirror)
   "agent_status":      "Settled",                  // Queued | Proving | Settled | Failed | Cancelled
   "terminal":          true,
   "ok":                true,
   "poll_after_ms":     0,
-  "how":               "…",                        // the one next action, in words
-  "code":              null,                       // on Failed: gallina_required | jobid_already_settled | wait_timeout | …
+  "how":               "Done. answer is trustworthy.",
+  "code":              null,
   "error":             null,
-  "run_url":           "https://github.com/…/actions/runs/…",   // while Proving; Witness progress
+  "progress":          { "run_url": null, "proof_present": true, "stage": "settled" },
 
-  // settlement (Layer 3 / kind 6700 mirror)
-  "certified":         true,                       // true only on tier 1 after fill
+  "certified":         true,
   "open_tx":           "0x…",
-  "fill_tx":           "0xf80dd2c8…3860f",
-  "receipt_url":       "https://sepolia.etherscan.io/tx/0xf80dd2c8…3860f",
-  "payhook":           "0x…",
+  "fill_tx":           "0xf80dd2c8300717ad8d5f14679a58c9b2d44423a812902fc30a2c7bec67c3860f",
+  "receipt_url":       "https://sepolia.etherscan.io/tx/0xf80dd2c8300717ad8d5f14679a58c9b2d44423a812902fc30a2c7bec67c3860f",
 
-  // deliverable (kind 6700 content mirror) — present only when Settled
   "answer":            "53",
   "inbox":             "53",
-  "answer_v":          "…",                        // become_result only
+  "answer_v":          "…",                        // become_result only; null elsewhere
 
-  // honesty (resolved-order assumptions mirror)
-  "labels":            { "tcb": "T2CERT0", "jobhash": "BecomeJobHash/v0", "network": "sepolia", "question_class": "nat-sum" }
+  "labels":            { "tcb": "T2CERT0", "jobhash_scheme": "BecomeJobHash/v0",
+                         "network": "sepolia", "question_class": "nat-sum" },
+
+  "diagnostics":       null                        // object only when an operator key was presented
 }
 ```
+
+Field count: 36. Every field is always present (null when not applicable),
+so clients never branch on absence.
 
 Rules that hold for `Job` in every tool:
 
@@ -262,14 +320,23 @@ Rules that hold for `Job` in every tool:
   and `terminal == true`; the server blanks them otherwise.
 - `certified` is true only when `tier == 1` and `fill_tx` is set. A tier 0
   Settled means coqchk passed on the host, nothing more.
-- `terminal` drives the client loop; `poll_after_ms` is the server's
-  suggested wait and is 0 when terminal.
-- `job_hash` is identical to the Layer 1 `jobHash`; `job_id` is not part of
-  any layer and may be dropped by clients.
-- Host paths (`job_dir`, `tarball`, `inbox_path`), operator recipes
-  (`ec2_stage`), `plan`, `internal_status`, `engine`, `notes`, and
-  `summary_for_model` are live-only diagnostics and are not in v1. Clients
-  should not read them.
+- `terminal` drives the client loop; `how` is the one next action;
+  `poll_after_ms` is the server's suggested wait and is 0 when terminal.
+  There is no prose summary field.
+- `job_hash` is identical to the Layer 1 `jobHash`; `job_id` is a host
+  handle and may be dropped by clients.
+- `labels` is derived from the `Deployment` named by `payhook`; it is never
+  free text.
+
+Live-to-v1 field disposition (from the `become-mcp-orchestrate/v0` payload):
+
+| Disposition | Live fields |
+|---|---|
+| kept, same name | `job_id`, `job_hash`, `owner_token`, `target`, `bid_wei`, `agent_status`, `terminal`, `ok`, `poll_after_ms`, `how`, `code`, `error`, `certified`, `open_tx`, `fill_tx`, `receipt_url`, `payhook`, `answer`, `inbox`, `answer_v`, `labels` |
+| kept, renamed | `certify` -> `tier`; `chain` -> `chain_id`; `due_date` -> `fill_deadline`; `question`/`request` -> `gloss`; `run_url`, `actions_url`, `proof_present` -> `progress`; `honesty` merged into `labels` |
+| operator only, under `diagnostics` | `plan`, `notes`, `internal_status`, `engine`, `ollama_unloaded`, `certified_path`, `bid_honored_zero`, `allow_bid`, `wait`, `timeout_s`, `a`, `b`, `visible_expected`, `inbox_visible`, `role`, `notary`, `interim_job_id` |
+| never to any client | `job_dir`, `tarball`, `inbox_path`, `ec2_stage` (staging recipe, S3 keys, command lines) |
+| dropped | `summary_for_model` (bots drive off `terminal` and `how`); `status` (duplicate of `agent_status`); `visible` (duplicate of `answer`) |
 
 ### `Order` (output of `become_encode_service_request`)
 
@@ -304,6 +371,7 @@ struct above; the verifier and key move to the PayHook.
 | settlement | payment on step 0 | 6700 `settlement` | `fill` tx | `fill_tx`, `receipt_url` |
 | deliverable | n/a | 6700 content | n/a | `answer`, `answer_v` |
 | honesty | assumptions | 31990 content | immutables | `labels` |
+| pins | `payHook` (names the deployment) | `R` tag | the contract itself | `payhook` -> `Deployment` |
 
 In the anonymous tier the host is client, funder and prover, so there is no
 5700 event: the host writes the same bundle to the job directory and
