@@ -143,10 +143,11 @@ Decrypted `content` is a JSON bundle:
 }
 ```
 
-Rules: no `i`, `output` or `bid` tags. `x` equals `order.jobHash`.
-`sha256(content ciphertext) == orderData.payloadHash`. The 5700 event id
-becomes `payloadLocator` in the on-chain order. An order with
-`claimant = address(0)` has no `p` tag and clear content.
+Rules: no `i`, `output` or `bid` tags. `x` equals `envelope.jobHash`, and
+the content's `specRoot` must recompute from the client graphs it carries.
+The 5700 event id is recorded by the provider in `become:request event`;
+it is not part of the order. An order with `claimant = address(0)` has no
+`p` tag and clear content.
 
 Intake, in order, silent on failure: addressed and encrypted; PayHook shows
 `jobs(jobHash)` open, claimant BECOME, `amount >= bidWei`, `deadline` ahead;
@@ -176,7 +177,7 @@ transaction. Verifier address and `programVKey` are immutables of the hook.
 | Part | Value |
 |---|---|
 | steps[0] | `Call` payHook.`fill(bytes32,bytes,bytes)` with [`jobHash`, var `publicValues`, var `proof`]; `NeedsVariable(proof)`, `NeedsVariable(publicValues)`, `TimingBounds(block.timestamp, 0, fillDeadline)`, `SpendsGas(est)`, `RevertPolicy(abort, "settled")`, `RevertPolicy(abort, "deadline")`, `RevertPolicy(abort, "bad proof")` |
-| variables | `StepCaller(0)`; `PaymentRecipient` (= caller); `Witness("sp1-groth16", abi.encode(programVKey, payloadLocator), [jobHash]) -> proof`; `Witness("sp1-public-values", same) -> publicValues`; `Query(payHook.jobs(jobHash))` |
+| variables | `StepCaller(0)`; `PaymentRecipient` (= caller); `Witness("sp1-groth16", abi.encode(programVKey, developmentHash), [jobHash]) -> proof`; `Witness("sp1-public-values", same) -> publicValues`; `Query(payHook.jobs(jobHash))` |
 | payments[0] | native `bidWei` from payHook to `PaymentRecipient`, on step 0, delay 0 |
 | assumptions | `sp1-verifier=0xb69f2584CBcFf99a58C4e7002E8b89Af54a6f4e2`, `program-vkey=0x00116101c20b687297ae11e1fea4bd4bd003ef3320da147a3db1f65bc81f388c`, `tcb=T2CERT0`, `jobhash-scheme=BecomeJobHash/v0`, `network=sepolia`, `question-class=nat-sum`, `native-payment`, `exclusive-claimant=<addr>` when set |
 
@@ -383,8 +384,8 @@ Live-to-v1 field disposition (from the `become-mcp-orchestrate/v0` payload):
   "order_data_type": "0x…",
   "order_data":      "0x<abi-encoded BecomeOrderData>",
   "order":           { "schemaVersion": 1, "jobHash": "0x…", "specRoot": "0x…", "acceptanceRuleHash": "0x…",
-                       "payHook": "0x…", "claimant": "0x…", "refundTo": "0x…", "bidWei": "0",
-                       "tier": 1, "payloadHash": "0x…", "payloadLocator": "0x…" },
+                       "payHook": "0x…", "claimant": "0x…", "funder": "0x…", "refundTo": "0x…",
+                       "bidWei": "0", "tier": 1 },
   "envelope":        { "originSettler": "0x…", "user": "0x…", "nonce": "0x…", "originChainId": 11155111,
                        "openDeadline": 1789003600, "fillDeadline": 1789086400 },
   "eip712":          { "domain": {…}, "types": {…}, "primaryType": "BecomeOrderData", "message": {…} },
