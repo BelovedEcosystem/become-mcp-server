@@ -414,7 +414,7 @@ struct above; the verifier and key move to the PayHook.
 
 In the anonymous tier the host is client, funder and prover, so there is no
 5700 event: the host writes the same bundle to the job directory and
-`payload_locator` is zero. Every job still has a Layer 1 order and a Layer 1b
+`request_event` is null. Every job still has a Layer 1 order and a Layer 1b
 resolution.
 
 ## Invariants
