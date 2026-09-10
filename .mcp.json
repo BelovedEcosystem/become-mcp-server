@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "become": {
+      "type": "http",
+      "url": "https://mcp.belovedecosystem.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${BECOME_MCP_API_KEY}"
+      }
+    }
+  }
+}
