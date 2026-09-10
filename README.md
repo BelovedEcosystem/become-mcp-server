@@ -32,7 +32,7 @@ claude mcp add --transport http become https://mcp.belovedecosystem.com/mcp
 
 **Any client with a project config:** this repo ships a root [`.mcp.json`](.mcp.json); clone it and Claude Code offers the server automatically. No header, no key.
 
-**Then ask:** call `become_orchestrate` with `target: "exists n : nat, 5 + 1 = n"`. You get `6`, Settled, in seconds. Add `certify: true` for a Sepolia-settled proof (about 1–2 hours; keep the returned `job_id` and `owner_token` to poll). Full contract with real responses: [`/agent.md`](https://mcp.belovedecosystem.com/agent.md). Design notes: [`docs/LEAST-FRICTION.md`](docs/LEAST-FRICTION.md).
+**Then ask:** call `become_orchestrate` with `target: "exists n : nat, 5 + 1 = n"`. You get `6`, Settled, in seconds. Add `certify: true` for a Sepolia-settled proof (about 1–2 hours; keep the returned `job_id` and `owner_token` to poll). Full contract with real responses: [`/agent.md`](https://mcp.belovedecosystem.com/agent.md). Design notes: [`docs/LEAST-FRICTION.md`](docs/LEAST-FRICTION.md). Target data model (quads, ERC-7683, Nostr 5700, MCP): [`docs/SCHEMA.md`](docs/SCHEMA.md).
 
 ## Production host
 
