@@ -79,21 +79,20 @@ The thing the client authorizes and the resolver reads. ABI-encoded
 ```solidity
 struct BecomeOrderData {
     uint16  schemaVersion;      // 1
-    bytes32 jobHash;            // order id; first field of publicValues
-    bytes32 specRoot;           // manifest hash; 0x0 while BecomeJobHash/v0 is used
-    bytes32 acceptanceRuleHash; // hash(target FQN, permitted axioms, coq version, flags)
+    bytes32 jobHash;            // order id = sha256(specRoot || nonce); first field of publicValues
+    bytes32 specRoot;           // sha256 of the canonical client graphs (question incl. manifest)
+    bytes32 acceptanceRuleHash; // sha256 of canonical sow + manifest + sli + slm graphs
     address payHook;            // settlement contract; pins verifier + programVKey
     address claimant;           // prover allowed to fill; address(0) = any
+    address funder;             // who locks the stake (client, or a relayer on its behalf)
     address refundTo;           // receives an expired stake
     uint256 bidWei;             // stake in wei; 0 allowed
-    uint8   tier;               // 0 = smoke (coqchk only), 1 = certified (proof + chain)
-    bytes32 payloadHash;        // sha256 of the encrypted request bundle (Layer 2 content)
-    bytes32 payloadLocator;     // Nostr event id of the 5700 request, or 0x0
+    uint8   tier;               // 0 = smoke (unattested host check), 1 = certified (proof + chain)
 }
 bytes32 constant BECOME_ORDER_DATA_TYPE_HASH = keccak256(
   "BecomeOrderData(uint16 schemaVersion,bytes32 jobHash,bytes32 specRoot,"
-  "bytes32 acceptanceRuleHash,address payHook,address claimant,address refundTo,"
-  "uint256 bidWei,uint8 tier,bytes32 payloadHash,bytes32 payloadLocator)"
+  "bytes32 acceptanceRuleHash,address payHook,address claimant,address funder,"
+  "address refundTo,uint256 bidWei,uint8 tier)"
 );
 ```
 
@@ -102,8 +101,10 @@ Authorization: EIP-712 signature over this struct by the funder, or a direct
 envelope fields, not struct fields; `fillDeadline` is the PayHook `deadline`.
 
 Job hash rule in force: `BecomeJobHash/v0 = sha256(Question.v bytes)`. Target
-rule: `jobHash = H(specRoot, nonce)` once the manifest exists. Either way the
-answer file is never hashed.
+rule (quads v2): `specRoot = sha256(canonical client graphs)`, `jobHash =
+sha256(specRoot || nonce)`. Either way the answer file is never hashed. The
+former `payloadHash` / `payloadLocator` fields were removed: they depended
+on the published event and could not be inside the hash.
 
 ## Layer 2: the request on Nostr (kind 5700)
 
@@ -318,8 +319,8 @@ Owner decision 2026-09-10.
   "refund_to":         "0x11bD4139BaAfcd9F19DA44D924b499AfD29032Eb",
   "spec_root":         "0x0000000000000000000000000000000000000000000000000000000000000000",
   "acceptance_rule_hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-  "payload_hash":      "0x0000000000000000000000000000000000000000000000000000000000000000",
-  "payload_locator":   "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "funder":            "0x11bD4139BaAfcd9F19DA44D924b499AfD29032Eb",
+  "request_event":     null,                       // 5700 event id when the request came over Nostr; from become:request
 
   "agent_status":      "Settled",                  // Queued | Proving | Settled | Failed | Cancelled
   "terminal":          true,
@@ -348,7 +349,7 @@ Owner decision 2026-09-10.
 }
 ```
 
-Field count: 38 (`late`, `due_date` added with the quad model). Every field is always present (null when not applicable),
+Field count: 38 (quads v2: `payload_hash`/`payload_locator` replaced by `funder`/`request_event`). Every field is always present (null when not applicable),
 so clients never branch on absence.
 
 Rules that hold for `Job` in every tool:
