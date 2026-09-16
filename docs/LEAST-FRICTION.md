@@ -1,5 +1,7 @@
 # Least-friction connect: what the server must do
 
+> **Note:** This document describes the design principles for friction-free onboarding. Where it references "Sepolia" for settlement examples, understand that **production BECOME settles certified jobs on Ethereum mainnet** via the PayHook contract. Sepolia was used only for rehearsal (2026-06 through 2026-08).
+
 Written from the customer seat: an AI chatbot (Claude, Cursor, any MCP client)
 that has never heard of BECOME and has only the URL. The goal is
 **URL in → first Settled answer out in under two minutes, with no human
@@ -73,7 +75,7 @@ that only ever sees `tools/list` must be able to succeed. Concretely:
 ```json
 {
   "name": "become_orchestrate",
-  "description": "Ask BECOME a question and get a Coq-checked answer. Send EITHER `target` (a Gallina proposition, e.g. \"exists n : nat, 5 + 1 = n\") OR `question` (plain English arithmetic, e.g. \"5 + 1 = ?\"; the server translates simple forms and returns `gallina_required` with a suggested `target` if it cannot). Default certify:false runs in seconds and needs no auth. certify:true proves on EC2 (~60 min) and settles on Sepolia; needs auth. Returns job_id and agent_status. Only trust `answer` when agent_status == \"Settled\". If `terminal` is false, call become_status with job_id after `poll_after_ms`.",
+  "description": "Ask BECOME a question and get a Coq-checked answer. Send EITHER `target` (a Gallina proposition, e.g. \"exists n : nat, 5 + 1 = n\") OR `question` (plain English arithmetic, e.g. \"5 + 1 = ?\"; the server translates simple forms and returns `gallina_required` with a suggested `target` if it cannot). Default certify:false runs in seconds and needs no auth. certify:true proves on EC2 (~60 min) and settles on Ethereum mainnet via PayHook; needs auth. Returns job_id and agent_status. Only trust `answer` when agent_status == \"Settled\". If `terminal` is false, call become_status with job_id after `poll_after_ms`.",
   "inputSchema": {
     "type": "object",
     "properties": {
@@ -148,8 +150,8 @@ split. Do both, server-side:
 1. Fresh Claude.ai account. Settings → Connectors → Add custom → paste URL. No key.
 2. New chat: "Ask BECOME what 5 + 1 is."
 3. Expect: tools listed, become_orchestrate called with certify:false, Settled, answer 6.  ≤ 2 minutes, zero secrets.
-4. "Now certify it on Sepolia."
-5. Expect: tool result says auth_required with a link; client opens OAuth consent; user clicks Allow; call retried; job enters Proving.
+4. "Now certify it on mainnet."
+5. Expect: tool result says auth_required with a link; client opens OAuth consent; user clicks Allow; call retried; job enters Proving; settles on Ethereum mainnet.
 ```
 
 If step 3 needs a human to hand over anything, the friction goal is not met.

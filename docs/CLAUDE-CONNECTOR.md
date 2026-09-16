@@ -35,4 +35,5 @@ Anthropic guide: https://support.claude.com/en/articles/11175166-get-started-wit
 
 - This is a **custom** connector you add — not (yet) an Anthropic-curated directory listing.
 - `certify: true` + `certify_requires_ec2` / `Proving` is normal on this host; keep polling.
-- Prefer Target shape `exists n : nat, A + B = n` for NatToy.
+- Prefer Target shape `exists n : nat, A + B = n` for Gallina arithmetic propositions.
+- **Production reality:** Certified jobs settle on **Ethereum mainnet**, not Sepolia testnet (Sepolia was rehearsal only).

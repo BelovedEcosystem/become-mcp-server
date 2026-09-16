@@ -5,7 +5,7 @@
 <h1 align="center">BECOME MCP Server</h1>
 
 <p align="center">
-  <b>The remote Model Context Protocol (MCP) front door for BECOME: any AI client asks a Gallina question with no key and no login; the host Coq-checks it in seconds, and can certify it with an EC2 proof settled on Sepolia.</b>
+  <b>The remote Model Context Protocol (MCP) front door for BECOME: any AI client asks a Gallina question with no key and no login; the host Coq-checks it in seconds, and can certify it with an EC2 proof settled on Ethereum mainnet via PayHook.</b>
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@ claude mcp add --transport http become https://mcp.belovedecosystem.com/mcp
 
 **Any client with a project config:** this repo ships a root [`.mcp.json`](.mcp.json); clone it and Claude Code offers the server automatically. No header, no key.
 
-**Then ask:** call `become_orchestrate` with `target: "exists n : nat, 5 + 1 = n"`. You get `6`, Settled, in seconds. Add `certify: true` for a Sepolia-settled proof (about 1–2 hours; keep the returned `job_id` and `owner_token` to poll). Full contract with real responses: [`/agent.md`](https://mcp.belovedecosystem.com/agent.md). Design notes: [`docs/LEAST-FRICTION.md`](docs/LEAST-FRICTION.md).
+**Then ask:** call `become_orchestrate` with `target: "exists n : nat, 5 + 1 = n"`. You get `6`, Settled, in seconds. Add `certify: true` for a mainnet-settled proof via PayHook (about 1–2 hours; keep the returned `job_id` and `owner_token` to poll). Full contract with real responses: [`/agent.md`](https://mcp.belovedecosystem.com/agent.md) or [`docs/agent.md`](docs/agent.md). Design notes: [`docs/LEAST-FRICTION.md`](docs/LEAST-FRICTION.md).
 
 ## Production host
 
@@ -84,8 +84,8 @@ Name **Beloved BECOME**, MCP URL above, auth empty. Grok's first-contact review 
 
 ## Default client path
 
-1. Prefer **`become_orchestrate`** with Gallina `target` (e.g. `exists n : nat, 5 + 1 = n`), `bid_wei=0`, `chain=sepolia`.
-2. `certify: false` = checked in seconds; `certify: true` = EC2 proof (~1–2 h) then auto-settled on Sepolia with a `receipt_url`.
+1. Prefer **`become_orchestrate`** with Gallina `target` (e.g. `exists n : nat, 5 + 1 = n`), `bid_wei=0`.
+2. `certify: false` = checked in seconds; `certify: true` = EC2 proof (~1–2 h) then auto-settled on **Ethereum mainnet** via PayHook with a `receipt_url`.
 3. Prefer `wait: false` on certify; keep the returned `job_id` **and** `owner_token`; poll **`become_status`** then **`become_result`** with both.
 4. Drive off `agent_status`. **Never trust** `answer` / `inbox` / `answer_v` until `Settled`.
 5. If `auto_generate` / `run_id` is present → **poll only** (do not upload to S3 or dispatch GHA yourself).
@@ -113,8 +113,9 @@ Skill: [`skills/become-use/SKILL.md`](skills/become-use/SKILL.md).
 ## Honesty
 
 - Job hash: **BecomeJobHash/v0**
-- Settlement TCB: **T2CERT0** (not full coqchk-in-guest)
-- **Sepolia ≠ mainnet**
+- Settlement chain: **Ethereum mainnet** via PayHook contract
+- Settlement TCB: **T2CERT0** (EC2 Nitro Enclave attestation + certificate verification; **not** full coqchk-in-guest)
+- **Historical note:** Sepolia testnet was used for rehearsal (2026-06 through 2026-08); production settles on mainnet
 - Never send private keys through the ask path
 
 ## FAQ
@@ -125,7 +126,7 @@ You polled a job without its `owner_token`, or from a session that did not creat
 
 ### Why `jobid_already_settled`?
 
-That exact target was already certified on Sepolia. Change the numbers; the prior receipt is in the error.
+That exact target was already certified on mainnet. Change the numbers; the prior receipt is in the error.
 
 ### Do I need EC2 myself for certify?
 

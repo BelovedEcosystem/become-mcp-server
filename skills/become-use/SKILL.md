@@ -30,7 +30,7 @@ Claude custom connector: name **Beloved BECOME**, same URL, auth empty. See `doc
 
 ## 2. Happy path
 
-1. Prefer **`become_orchestrate`** with Gallina `target` (e.g. `exists n : nat, 5 + 1 = n`), `bid_wei=0`, `chain=sepolia`.
+1. Prefer **`become_orchestrate`** with Gallina `target` (e.g. `exists n : nat, 5 + 1 = n`), `bid_wei=0`.
 2. Keep `job_id` **and** `owner_token` from the response; pass both when polling.
 3. If not Settled yet: poll **`become_status`** (then **`become_result`**) with `job_id` + `owner_token` while `terminal=false`. Polling early is harmless; certified proofs take ~1–2 h.
 4. Trust `answer` / `inbox` **only** when `agent_status=Settled`.
@@ -56,4 +56,4 @@ Never trust `answer`, `inbox`, `answer_v`, or `visible_result` before `Settled`.
 
 ## 6. Honesty
 
-BecomeJobHash/v0 · T2CERT0 · Sepolia ≠ mainnet · no private keys in ask.
+BecomeJobHash/v0 · T2CERT0 (EC2 attestation + certificate verification; not full coqchk-in-guest) · **Production settles on Ethereum mainnet** via PayHook · Sepolia was rehearsal only (2026-06 through 2026-08) · no private keys in ask.
